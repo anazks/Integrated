@@ -2,6 +2,14 @@ const express = require("express");
 const { DoctorModel } = require("../models/Doctor.model");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
+const nodemailer = require('nodemailer')
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+      user: 'anazksunil2@gmail.com',  // Replace with your email
+      pass: 'gefd cyst feti eztk'
+  }
+});
 
 const router = express.Router();
 
@@ -17,19 +25,46 @@ router.get("/", async (req, res) => {
 
 router.post("/register", async (req, res) => {
   const { email } = req.body;
+  
   try {
-    const doctor = await DoctorModel.findOne({ email });
-    if (doctor) {
-      return res.send({
-        message: "Doctor already exists",
-      });
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
     }
-    let value = new DoctorModel(req.body);
-    await value.save();
-    const data = await DoctorModel.findOne({ email });
-    return res.send({ data, message: "Registered" });
+
+    const existingDoctor = await DoctorModel.findOne({ email });
+    if (existingDoctor) {
+      return res.status(400).json({ message: "Doctor already exists" });
+    }
+
+    const newDoctor = new DoctorModel(req.body);
+    await newDoctor.save();
+
+    const savedDoctor = await DoctorModel.findOne({ email });
+
+    const mailOptions = {
+      from: 'Integrated Patient Care System ',
+      to: email,
+      subject: "Your Account Has Been Activated",
+      text: `Hello,
+
+Your account has been successfully activated. You can now log in to the system using your credentials.
+
+Best regards,
+Integrated Patient Care System Team ${savedDoctor}`
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Error sending email:", error);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
+
+    return res.status(201).json({ data: savedDoctor, message: "Registered successfully" });
   } catch (error) {
-    res.send({ message: "error" });
+    console.error("Error in registration:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
